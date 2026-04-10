@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ポモドーロ</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#f0ede8; --surface:#fff; --text:#1a1a1a; --muted:#aaa;
+  --focus:#4a90d9; --break:#5db87a; --long:#e07b4a;
+  --ring-bg:#e0ddd8; --border:#e8e5e0; --input-bg:#f5f2ee;
+  --tabbar:#fff; --tabbar-border:#e8e5e0;
+  --toggle-bg: #e2dfda;
+}
+body.dark {
+  --bg:#000; --surface:#111; --text:#f0f0f0; --muted:#555;
+  --ring-bg:#222; --border:#2e2e2e; --input-bg:#1a1a1a;
+  --tabbar:#111; --tabbar-border:#222;
+  --toggle-bg: #222;
+}
+
+body {
+font-family:'Noto Sans JP',sans-serif;
+background:var(--bg); color:var(--text);
+min-height:100vh; display:flex; flex-direction:column;
+align-items:center;
+transition:background 0.3s, color 0.3s;
+padding-bottom:70px;
+}
+
+.screen { display:none; flex-direction:column; align-items:center; justify-content:center; width:100%; max-width:360px; min-height:calc(100vh - 70px); padding:32px 24px; gap:20px; }
+.screen.active { display:flex; }
+
+/* ── GOAL BAR ── */
+.goal-container { width:100%; display:flex; flex-direction:column; gap:8px; cursor:pointer; }
+.goal-header { display:flex; justify-content:space-between; font-size:12px; font-weight:600; color:var(--muted); }
+.goal-bar-bg { width:100%; height:6px; background:var(--ring-bg); border-radius:3px; overflow:hidden; }
+.goal-bar-fill { height:100%; background:var(--focus); width:0%; transition:width 1s linear; }
+
+/* ── TIMER SCREEN ── */
+.status-badge { padding:6px 20px; border-radius:999px; font-size:13px; font-weight:500; background:var(--focus); color:#fff; transition:background 0.5s; letter-spacing:0.3px; }
+.ring-wrap { position:relative; width:240px; height:240px; }
+svg.ring { width:100%; height:100%; transform:rotate(-90deg); }
+.ring-track { fill:none; stroke:var(--ring-bg); stroke-width:13; }
+.ring-bar { fill:none; stroke:var(--focus); stroke-width:13; stroke-linecap:round; stroke-dasharray:628; stroke-dashoffset:0; transition:stroke-dashoffset 1s linear, stroke 0.5s; }
+.ring-center { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; display:flex; flex-direction:column; align-items:center; gap:8px; }
+.time-big { font-family:'DM Mono',monospace; font-size:54px; font-weight:300; letter-spacing:-2px; line-height:1; }
+.next-lbl { font-size:11px; color:var(--muted); margin-bottom: 2px; }
+.dots { display:flex; gap:8px; }
+.dot { width:7px; height:7px; border-radius:50%; background:var(--ring-bg); transition:background 0.4s; }
+.dot.done { background:var(--focus); }
+.dot.current { background:var(--focus); opacity:0.4; }
+
+.controls { display:flex; align-items:center; gap:24px; }
+.btn-circle { width:44px; height:44px; border-radius:50%; border:1.5px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s; }
+.btn-circle:hover { color:var(--text); border-color:var(--muted); }
+.btn-play { width:64px; height:64px; border-radius:50%; border:none; background:var(--focus); color:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 4px 20px rgba(74,144,217,0.35); transition:all 0.25s; }
+.btn-share { display:flex; align-items:center; gap:6px; padding:10px 24px; border-radius:999px; border:1.5px solid var(--border); background:transparent; color:var(--text); font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; margin-top: 12px; }
+
+/* ── SETTINGS SCREEN ── */
+.settings-screen { justify-content:flex-start; padding-top:48px; gap:16px; overflow-y: auto; }
+.screen-title { font-size:22px; font-weight:600; align-self:flex-start; margin-bottom:8px; }
+.card { width:100%; background:var(--surface); border-radius:20px; padding:20px; display:flex; flex-direction:column; gap:18px; box-shadow:0 4px 20px rgba(0,0,0,0.04); }
+.card-title { font-size:11px; font-weight:600; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase; }
+.row-s { display:flex; align-items:center; justify-content:space-between; }
+.lbl { font-size:14px; font-weight:400; }
+
+.inp { 
+  width:64px; padding:8px; border-radius:10px; border:1.5px solid var(--border); 
+  background:var(--input-bg); color:var(--text); font-family:'DM Mono',monospace; 
+  font-size:15px; text-align:center; outline:none; 
+  -moz-appearance: textfield;
+}
+.inp::-webkit-outer-spin-button, .inp::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.toggle-wrap { display:flex; background:var(--toggle-bg); padding:4px; border-radius:12px; position:relative; min-width: 110px; }
+.theme-btn { flex: 1; border:none; background:transparent; color:var(--muted); font-family:inherit; font-size:12px; font-weight:500; padding:8px 0; cursor:pointer; z-index: 2; transition: color 0.3s; }
+.theme-btn.active { color:var(--text); }
+.toggle-slider { position: absolute; top: 4px; left: 4px; width: calc(50% - 4px); height: calc(100% - 8px); background: var(--surface); border-radius: 9px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1); z-index: 1; }
+
+.btn-danger { background:rgba(255, 77, 79, 0.1); border:none; color:#ff4d4f; padding:12px; border-radius:12px; font-size:13px; font-weight:600; cursor:pointer; transition: all 0.2s; margin-top: 4px; }
+
+.tabbar { position:fixed; bottom:0; left:0; right:0; height:74px; background:var(--tabbar); border-top:1px solid var(--tabbar-border); display:flex; align-items:center; justify-content:space-around; z-index: 100; padding-bottom: 10px; }
+.tab-btn { display:flex; flex-direction:column; align-items:center; gap:4px; background:none; border:none; color:var(--muted); font-size:11px; font-weight:500; cursor:pointer; width: 100%; transition: color 0.2s; }
+.tab-btn.active { color:var(--focus); }
+.tab-btn svg { width:24px; height:24px; fill:currentColor; }
+</style>
+</head>
+<body>
+
+<div class="screen active" id="screen-timer">
+  <div class="goal-container" onclick="toggleGoalDisplay()">
+    <div class="goal-header"><span>今日の目標</span><span id="goal-text">0 / 120 分</span></div>
+    <div class="goal-bar-bg"><div class="goal-bar-fill" id="goal-bar"></div></div>
+  </div>
+  
+  <div class="status-badge" id="badge">ポモドーロ</div>
+  
+  <div class="ring-wrap" id="ring-wrap">
+    <svg class="ring" viewBox="0 0 220 220">
+      <circle class="ring-track" cx="110" cy="110" r="100"/>
+      <circle class="ring-bar" id="bar" cx="110" cy="110" r="100"/>
+    </svg>
+    <div class="ring-center">
+      <div class="time-big" id="time">25:00</div>
+      <div class="next-lbl" id="next-label"></div>
+      <div class="dots" id="dots"></div>
+    </div>
+  </div>
+  
+  <div class="controls">
+    <button class="btn-circle" onclick="resetAll()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/></svg>
+    </button>
+    <button class="btn-play" id="btn-play" onclick="toggleTimer()">
+      <svg id="ico-play" width="32" height="32" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
+      <svg id="ico-pause" width="32" height="32" viewBox="0 0 24 24" fill="white" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+    </button>
+    <button class="btn-circle" onclick="skipCurrent()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2-8.14L11.03 12 8 14.14V9.86zM16 6h2v12h-2z"/></svg>
+    </button>
+  </div>
+  
+  <button class="btn-share" onclick="shareToX()"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.265 5.638L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>記録をシェア</button>
+</div>
+
+<div class="screen settings-screen" id="screen-settings">
+  <div class="screen-title">設定</div>
+  <div class="card">
+    <div class="card-title">デイリー目標</div>
+    <div class="row-s"><span class="lbl">1日の目標時間</span><div class="inp-wrap"><input class="inp" type="number" id="s-goal" value="120" onchange="applyS()"><span class="unit">分</span></div></div>
+    <div class="row-s"><span class="lbl">表示単位</span><div class="toggle-wrap"><div class="toggle-slider" id="unit-slider"></div><button class="theme-btn" id="unit-min" onclick="setGoalUnit('min')">分</button><button class="theme-btn" id="unit-percent" onclick="setGoalUnit('percent')">%</button></div></div>
+    <button class="btn-danger" onclick="resetTodayProgress()">今日の進捗をリセット</button>
+  </div>
+  <div class="card">
+    <div class="card-title">タイマー</div>
+    <div class="row-s"><span class="lbl">ポモドーロ</span><input class="inp" type="number" id="s-focus" value="25" onchange="applyS()"></div>
+    <div class="row-s"><span class="lbl">短い休憩</span><input class="inp" type="number" id="s-break" value="5" onchange="applyS()"></div>
+    <div class="row-s"><span class="lbl">長い休憩</span><input class="inp" type="number" id="s-long" value="15" onchange="applyS()"></div>
+    <div class="row-s"><span class="lbl">長い休憩まで</span><input class="inp" type="number" id="s-interval" value="4" onchange="applyS()"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">自動スタート設定</div>
+    <div class="row-s"><span class="lbl">次の作業を自動スタート</span><input type="checkbox" id="s-auto-focus" onchange="saveSettings()" style="width:20px; height:20px; accent-color: var(--focus);"></div>
+    <div class="row-s"><span class="lbl">次の休憩を自動スタート</span><input type="checkbox" id="s-auto-break" onchange="saveSettings()" style="width:20px; height:20px; accent-color: var(--focus);"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">全般</div>
+    <div class="row-s"><span class="lbl">通知音を鳴らす</span><input type="checkbox" id="s-sound" checked onchange="saveSettings()" style="width:20px; height:20px; accent-color: var(--focus);"></div>
+    <div class="row-s"><span class="lbl">テーマ</span><div class="toggle-wrap"><div class="toggle-slider" id="theme-slider"></div><button class="theme-btn" id="theme-light" onclick="setTheme('light')">Light</button><button class="theme-btn" id="theme-dark" onclick="setTheme('dark')">Dark</button></div></div>
+  </div>
+</div>
+
+<nav class="tabbar">
+  <button class="tab-btn active" id="tab-timer" onclick="showScreen('timer')"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>タイマー</button>
+  <button class="tab-btn" id="tab-settings" onclick="showScreen('settings')"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>設定</button>
+</nav>
+
+<script>
+const CIRC = 2 * Math.PI * 100;
+let S = { focus:25, break:5, long:15, interval:4, goal:120, goalUnit:'min', sound: true, autoFocus: false, autoBreak: false };
+let focusDone = 0, phase = 'focus', remaining = 25*60, totalTime = 25*60, running = false, ticker = null, hist = [], audioCtx = null;
+
+const COLORS = { focus:'#4a90d9', break:'#5db87a', long:'#e07b4a' }, NAMES = { focus:'ポモドーロ', break:'短い休憩', long:'長い休憩' };
+const bar = document.getElementById('bar'), timeEl = document.getElementById('time'), badge = document.getElementById('badge'), nextLbl = document.getElementById('next-label'), dotsEl = document.getElementById('dots'), btnPlay = document.getElementById('btn-play'), goalBar = document.getElementById('goal-bar'), goalText = document.getElementById('goal-text');
+
+bar.style.strokeDasharray = CIRC;
+
+try { hist = JSON.parse(localStorage.getItem('pomo2') || '[]'); } catch(e){}
+try { const saved = JSON.parse(localStorage.getItem('pomo_settings')); if (saved) S = {...S, ...saved}; } catch(e){}
+
+function getTodayFocusSeconds() {
+  const today = new Date().toDateString();
+  return hist.filter(h => h.label === 'ポモドーロ' && h.date === today).reduce((t, i) => t + (i.sec || 0), 0);
+}
+
+function updateGoalUI() {
+  const compSec = getTodayFocusSeconds();
+  const currSec = (phase === 'focus') ? (totalTime - remaining) : 0;
+  const totalSec = compSec + currSec;
+  const goalSec = S.goal * 60;
+  const per = Math.min((totalSec / goalSec) * 100, 100);
+  goalBar.style.width = per + '%';
+  goalText.textContent = S.goalUnit === 'percent' ? Math.floor(per) + '%' : `${Math.floor(totalSec / 60)} / ${S.goal} 分`;
+  document.getElementById('unit-slider').style.transform = S.goalUnit === 'percent' ? 'translateX(100%)' : 'translateX(0)';
+}
+
+function playNotificationSound(type) {
+  if (!S.sound) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  const now = audioCtx.currentTime;
+  if (type === 'focus') { osc.frequency.setValueAtTime(523.25, now); osc.frequency.setValueAtTime(698.46, now + 0.2); gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.8); osc.start(now); osc.stop(now + 0.8); }
+  else { osc.frequency.setValueAtTime(783.99, now); gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5); osc.start(now); osc.stop(now + 0.5); }
+}
+
+function toggleTimer() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  if (running) { clearInterval(ticker); running = false; document.getElementById('ico-play').style.display = ''; document.getElementById('ico-pause').style.display = 'none'; }
+  else { running = true; document.getElementById('ico-play').style.display = 'none'; document.getElementById('ico-pause').style.display = ''; ticker = setInterval(tick, 1000); }
+}
+
+function tick() { if (remaining <= 0) { clearInterval(ticker); running = false; onDone(); return; } remaining--; updateDisplay(); updateGoalUI(); }
+
+function onDone() {
+  const elapsed = (phase === 'focus') ? (totalTime - remaining) : 0;
+  playNotificationSound(phase);
+  document.getElementById('ring-wrap').classList.add('flash');
+  setTimeout(() => document.getElementById('ring-wrap').classList.remove('flash'), 600);
+  
+  const finishedPhase = phase;
+
+  if (finishedPhase === 'focus' && elapsed > 0) {
+    hist.unshift({ label:'ポモドーロ', sec: elapsed, date: new Date().toDateString() });
+    localStorage.setItem('pomo2', JSON.stringify(hist));
+    focusDone++;
+    if (focusDone >= S.interval) { focusDone = 0; setPhase('long'); } else { setPhase('break'); }
+  } else { setPhase('focus'); }
+  
+  updateGoalUI();
+  document.getElementById('ico-play').style.display = ''; document.getElementById('ico-pause').style.display = 'none';
+
+  if (finishedPhase === 'focus' && S.autoBreak) toggleTimer();
+  else if (finishedPhase !== 'focus' && S.autoFocus) toggleTimer();
+}
+
+function setPhase(p) {
+  phase = p; totalTime = S[p] * 60; remaining = totalTime;
+  const c = COLORS[phase]; bar.style.stroke = c;
+  badge.style.background = c; badge.textContent = NAMES[phase];
+  document.getElementById('btn-play').style.background = c;
+  nextLbl.textContent = phase === 'focus' ? (focusDone + 1 >= S.interval ? '次：長い休憩' : '次：短い休憩') : '次：ポモドーロ';
+  renderDots(); updateDisplay();
+}
+
+function renderDots() {
+  dotsEl.innerHTML = '';
+  for (let i = 0; i < S.interval; i++) {
+    const d = document.createElement('div');
+    d.className = i < focusDone ? 'dot done' : (i === focusDone && phase === 'focus' ? 'dot current' : 'dot');
+    dotsEl.appendChild(d);
+  }
+}
+
+function updateDisplay() {
+  const m = Math.floor(remaining/60).toString().padStart(2,'0'), s = (remaining%60).toString().padStart(2,'0');
+  timeEl.textContent = m+':'+s;
+  bar.style.strokeDashoffset = CIRC * (1 - remaining/totalTime);
+}
+
+function skipCurrent() { if (ticker) clearInterval(ticker); running = false; onDone(); }
+function resetAll() { if (ticker) clearInterval(ticker); running = false; setPhase(phase); }
+
+function applyS() {
+  S.focus = parseInt(document.getElementById('s-focus').value) || 25;
+  S.break = parseInt(document.getElementById('s-break').value) || 5;
+  S.long = parseInt(document.getElementById('s-long').value) || 15;
+  S.interval = parseInt(document.getElementById('s-interval').value) || 4;
+  S.goal = parseInt(document.getElementById('s-goal').value) || 120;
+  saveSettings(); if(!running) setPhase(phase);
+  updateGoalUI();
+}
+
+function setGoalUnit(unit) { S.goalUnit = unit; document.getElementById('unit-min').classList.toggle('active', unit === 'min'); document.getElementById('unit-percent').classList.toggle('active', unit === 'percent'); updateGoalUI(); saveSettings(); }
+function toggleGoalDisplay() { setGoalUnit(S.goalUnit === 'min' ? 'percent' : 'min'); }
+
+function saveSettings() { 
+  S.sound = document.getElementById('s-sound').checked; 
+  S.autoFocus = document.getElementById('s-auto-focus').checked;
+  S.autoBreak = document.getElementById('s-auto-break').checked;
+  localStorage.setItem('pomo_settings', JSON.stringify(S)); 
+}
+
+function resetTodayProgress() { 
+  if (!confirm("今日の記録をリセットしますか？")) return; 
+  const today = new Date().toDateString(); 
+  hist = hist.filter(h => h.date !== today); 
+  localStorage.setItem('pomo2', JSON.stringify(hist)); 
+  updateGoalUI();
+  alert("今日の進捗をリセットしました！");
+}
+
+function setTheme(t) {
+  document.body.classList.toggle('dark', t === 'dark');
+  document.getElementById('theme-light').classList.toggle('active', t !== 'dark');
+  document.getElementById('theme-dark').classList.toggle('active', t === 'dark');
+  document.getElementById('theme-slider').style.transform = t === 'dark' ? 'translateX(100%)' : 'translateX(0)';
+  localStorage.setItem('pomo_theme', t);
+}
+
+function showScreen(n) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); document.getElementById('screen-'+n).classList.add('active'); document.getElementById('tab-'+n).classList.add('active'); }
+
+function shareToX() {
+  const today = new Date().toDateString();
+  const todayFocus = hist.filter(h => h.label === 'ポモドーロ' && h.date === today);
+  const totalSec = todayFocus.reduce((t, h) => t + (h.sec || 0), 0);
+  const totalMins = Math.floor(totalSec / 60);
+  const validUrl = (window.location.href.startsWith('http')) ? window.location.href : "";
+  const text = `今日のポモドーロ記録 🍅\n集中時間: ${totalMins}分 / 目標: ${S.goal}分\n\n#ポモドーロ #集中`;
+  const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}${validUrl ? '&url=' + encodeURIComponent(validUrl) : ''}`;
+  window.open(xUrl, '_blank');
+}
+
+// Init values
+document.getElementById('s-focus').value = S.focus; 
+document.getElementById('s-break').value = S.break; 
+document.getElementById('s-long').value = S.long; 
+document.getElementById('s-interval').value = S.interval; 
+document.getElementById('s-goal').value = S.goal; 
+document.getElementById('s-sound').checked = S.sound !== false;
+document.getElementById('s-auto-focus').checked = !!S.autoFocus;
+document.getElementById('s-auto-break').checked = !!S.autoBreak;
+const savedTheme = localStorage.getItem('pomo_theme') || 'light';
+setTheme(savedTheme);
+setGoalUnit(S.goalUnit);
+setPhase('focus');
+</script>
+</body>
+</html>
