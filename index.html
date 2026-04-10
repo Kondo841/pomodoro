@@ -300,8 +300,8 @@ function shareToX() {
   const todayFocus = hist.filter(h => h.label === 'ポモドーロ' && h.date === today);
   const totalSec = todayFocus.reduce((t, h) => t + (h.sec || 0), 0);
   const totalMins = Math.floor(totalSec / 60);
-  const validUrl = (window.location.href.startsWith('http')) ? window.location.href : "";
-  const text = `今日のポモドーロ記録 🍅\n集中時間: ${totalMins}分 / 目標: ${S.goal}分\n\n#ポモドーロ #集中`;
+  const validUrl = 'https://pomodoro-six-sandy.vercel.app';
+  const text = `今日のポモドーロ記録 \n集中時間: ${totalMins}分 / 目標: ${S.goal}分\n\n#ポモドーロ #集中`;
   const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}${validUrl ? '&url=' + encodeURIComponent(validUrl) : ''}`;
   window.open(xUrl, '_blank');
 }
